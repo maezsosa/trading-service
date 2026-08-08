@@ -7,9 +7,10 @@ reescribir la lógica de estrategia o de riesgo.
 ## Arquitectura
 
 ```
-data/       MarketDataProvider: fuente de barras OHLCV (CSV, sintético, o un
-            exchange real vía ccxt más adelante). Misma interfaz para
-            histórico y tiempo real.
+data/       MarketDataProvider: fuente de barras OHLCV. CSVDataProvider y
+            SyntheticDataProvider para pruebas offline; CCXTHistoricalDataProvider
+            y CCXTLiveDataProvider para datos reales de cripto (público, sin
+            API keys). Misma interfaz para histórico y tiempo real.
 
 strategy/   Strategy: recibe una barra, opcionalmente devuelve una Signal.
             No sabe nada de tamaño de posición, cuenta ni ejecución.
@@ -25,29 +26,42 @@ broker/     Broker: ejecuta una Order y devuelve un Fill. PaperBroker
             posiciones, PnL realizado). Un broker real implementa la misma
             interfaz.
 
-backtest/   Backtester: reproduce barras a través de
-            strategy -> risk manager -> broker, usando las mismas clases
-            que usaría un run en vivo.
+core/       Tipos compartidos (Bar, Signal, Order, Fill, Position,
+            AccountState) y TradingSession, que procesa una barra a la vez
+            a través de strategy -> risk manager -> broker.
 
-core/       Tipos compartidos: Bar, Signal, Order, Fill, Position,
-            AccountState.
+backtest/   Backtester: reproduce barras históricas a través de una
+            TradingSession.
+
+live/       PaperTradingRunner: corre una TradingSession contra un feed en
+            vivo (CCXTLiveDataProvider), con logging de cada barra/orden y
+            alerta cuando se activa el kill switch.
 ```
 
-La idea es que **estrategia y riesgo nunca cambian entre backtest y
-producción** — solo cambia qué `MarketDataProvider` y qué `Broker` se
-conectan.
+La idea es que **estrategia y riesgo nunca cambian entre backtest, paper
+trading y producción** — solo cambia qué `MarketDataProvider` y qué
+`Broker` se conectan. `TradingSession` es el código compartido que
+garantiza eso.
 
 ## Uso rápido
 
 ```bash
 pip install -r requirements.txt
 
-# Corre un backtest de ejemplo (datos sintéticos + cruce de medias móviles)
+# Backtest de ejemplo (datos sintéticos + cruce de medias móviles)
 python main.py
 
-# Tests
+# Paper trading en vivo contra Binance (datos públicos, sin API keys)
+python paper_trade.py --symbol BTC/USDT --timeframe 1m --poll-interval 30
+
+# Tests (no pegan a la red real: usan un exchange ccxt "fake" inyectado)
 pytest
 ```
+
+`paper_trade.py` acepta `--exchange` (cualquier id soportado por ccxt),
+`--symbol`, `--timeframe`, `--poll-interval`, `--cash`, `--fast-window` y
+`--slow-window`. La ejecución es 100% simulada (PaperBroker): no se manda
+ninguna orden real al exchange, solo se leen precios públicos.
 
 ## Gestión de riesgo (`risk/manager.py`)
 
@@ -63,8 +77,8 @@ Reglas configurables vía `RiskConfig`:
 - **`max_drawdown_pct`**: kill switch permanente si el equity cae más de
   este % desde su pico; requiere `reset_halt()` manual para reanudar.
 
-El `Backtester` además cierra posiciones automáticamente si el precio toca
-el `stop_loss_price` de la orden.
+Tanto el `Backtester` como el `PaperTradingRunner` cierran posiciones
+automáticamente si el precio toca el `stop_loss_price` de la orden.
 
 ## Agregar una estrategia nueva
 
@@ -72,16 +86,43 @@ Implementar `Strategy.on_bar(bar) -> Signal | None` (ver
 `strategy/moving_average_crossover.py` como referencia) y enchufarla en
 `main.py` o en el backtester — no requiere tocar el resto del sistema.
 
+## ccxt: histórico y paper trading en vivo
+
+`data/ccxt_provider.py` tiene dos proveedores, ambos sobre endpoints
+públicos (sin API keys):
+
+- `CCXTHistoricalDataProvider`: pagina `fetch_ohlcv` para traer histórico
+  real y correr el `Backtester` contra eso en vez de datos sintéticos.
+- `CCXTLiveDataProvider`: hace polling y solo emite una `Bar` cuando una
+  vela **cierra** (nunca la que está en formación), para que la estrategia
+  vea el mismo tipo de dato en vivo que en backtest. Si el exchange falla
+  transitoriamente, loguea un warning y reintenta en el próximo poll en vez
+  de tirar abajo la sesión.
+
+`PaperTradingRunner` (`live/paper_runner.py`) conecta ese feed con la misma
+`TradingSession` del backtest, y loguea cada barra, cada trade, y un
+warning explícito cuando se activa el kill switch de drawdown.
+
+**Nota de este entorno**: esta sesión corre en un sandbox cuya política de
+red no permite salir a `api.binance.com` (se probó y devuelve 403 del
+proxy de egress). El código está validado con tests que inyectan un
+exchange ccxt "fake" (sin red), y con una corrida real que confirmó que
+reintenta correctamente ante fallos de conexión — pero no pude hacer un
+smoke test contra Binance real desde acá. Corré `python paper_trade.py`
+desde tu máquina o un entorno con salida a internet para el primer
+paper-trading real.
+
 ## Próximos pasos
 
-- **Data feed real**: implementar `MarketDataProvider` sobre `ccxt` (cripto)
-  u otro SDK de broker, para histórico y para streaming en tiempo real.
-- **Broker real**: implementar `Broker` contra la API del exchange/broker
-  elegido, arrancando en modo *paper*/testnet antes de mover dinero real.
-- **Persistencia y logging**: guardar señales, órdenes y fills (DB o
-  archivo) para poder auditar y depurar corridas en vivo.
+- **Broker real**: implementar `Broker` contra la API del exchange elegido
+  (con API keys, arrancando en testnet) para pasar de paper trading a
+  ejecución real — el resto del sistema no cambia.
+- **Persistencia**: guardar señales, órdenes, fills y equity curve (DB o
+  archivo) para poder auditar y depurar corridas en vivo más allá de los
+  logs de consola.
 - **Alertas**: notificar (mail/Telegram/etc.) cuando se activa un stop, el
-  kill switch, o hay errores de conexión repetidos.
+  kill switch, o hay errores de conexión repetidos — hoy solo queda
+  logueado.
 - **Más estrategias**: el sistema está pensado para tener varias
   estrategias corriendo en paralelo, cada una con su propia asignación de
   riesgo.

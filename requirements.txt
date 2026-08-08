@@ -1,5 +1,5 @@
 pytest>=7.0
+ccxt>=4.0
 
-# Cuando se conecte a un exchange/broker real, sumar por ejemplo:
-# ccxt        # exchanges de cripto
+# Cuando se agregue análisis/series más pesado, sumar por ejemplo:
 # pandas      # manejo de series de datos históricas
