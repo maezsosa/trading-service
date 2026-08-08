@@ -1,0 +1,5 @@
+pytest>=7.0
+
+# Cuando se conecte a un exchange/broker real, sumar por ejemplo:
+# ccxt        # exchanges de cripto
+# pandas      # manejo de series de datos históricas
