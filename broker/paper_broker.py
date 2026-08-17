@@ -33,6 +33,7 @@ class PaperBroker(Broker):
         position = self.account.positions.setdefault(order.symbol, Position(symbol=order.symbol))
         signed_qty = order.quantity if order.side == Side.BUY else -order.quantity
 
+        realized: float | None = None
         same_direction = position.quantity == 0 or (position.quantity > 0) == (signed_qty > 0)
         if same_direction:
             total_cost = position.avg_entry_price * position.quantity + execution_price * signed_qty
@@ -67,6 +68,7 @@ class PaperBroker(Broker):
             side=order.side,
             quantity=order.quantity,
             price=execution_price,
+            realized_pnl=realized,
         )
         self.fills.append(fill)
         return fill

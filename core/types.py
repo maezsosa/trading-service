@@ -56,13 +56,18 @@ class Order:
 
 @dataclass
 class Fill:
-    """Confirmation that an order was executed."""
+    """Confirmation that an order was executed.
+
+    realized_pnl is set only when this fill closed (all or part of) an
+    existing position -- None for a fill that opened or added to one.
+    """
 
     timestamp: datetime
     symbol: str
     side: Side
     quantity: float
     price: float
+    realized_pnl: float | None = None
 
 
 @dataclass

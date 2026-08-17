@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 
+from backtest.metrics import bars_per_year, compute_metrics, print_metrics
 from broker.paper_broker import PaperBroker
 from core.session import TradingSession
 from data.ccxt_provider import CCXTHistoricalDataProvider
@@ -61,20 +62,16 @@ def main() -> None:
 
     equity_curve = session.equity_curve
     final_equity = equity_curve[-1][1] if equity_curve else args.cash
-    peak = 0.0
-    max_drawdown = 0.0
-    for _, equity in equity_curve:
-        peak = max(peak, equity)
-        if peak > 0:
-            max_drawdown = max(max_drawdown, (peak - equity) / peak)
 
     print(f"Exchange:             {args.exchange}")
     print(f"Symbol:               {args.symbol} ({args.timeframe})")
     print(f"Bars procesadas:      {len(equity_curve)}")
     print(f"Equity inicial:       ${args.cash:,.2f}")
     print(f"Equity final:         ${final_equity:,.2f}")
-    print(f"Retorno:              {(final_equity / args.cash - 1):.2%}")
-    print(f"Max drawdown:         {max_drawdown:.2%}")
+    metrics = compute_metrics(
+        equity_curve, broker.fills, args.cash, periods_per_year=bars_per_year(args.timeframe)
+    )
+    print_metrics(metrics)
     print(f"Trades ejecutados:    {len(broker.fills)}")
     print(f"Kill switch activado: {risk_manager.halted} ({risk_manager.halt_reason or '-'})")
     if halt_triggered_at:

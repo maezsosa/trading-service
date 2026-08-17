@@ -7,6 +7,7 @@ from strategy.moving_average_crossover import MovingAverageCrossoverStrategy
 from risk.manager import RiskConfig, RiskManager
 from broker.paper_broker import PaperBroker
 from backtest.engine import Backtester
+from backtest.metrics import bars_per_year, compute_metrics, print_metrics
 
 
 def main() -> None:
@@ -36,21 +37,16 @@ def main() -> None:
     backtester = Backtester(strategy=strategy, risk_manager=risk_manager, broker=broker)
 
     equity_curve = backtester.run(data_provider.bars())
-
     final_equity = equity_curve[-1][1] if equity_curve else initial_cash
-    peak = 0.0
-    max_drawdown = 0.0
-    for _, equity in equity_curve:
-        peak = max(peak, equity)
-        if peak > 0:
-            max_drawdown = max(max_drawdown, (peak - equity) / peak)
 
     print(f"Seed:                 {args.seed}")
     print(f"Bars procesadas:      {len(equity_curve)}")
     print(f"Equity inicial:       ${initial_cash:,.2f}")
     print(f"Equity final:         ${final_equity:,.2f}")
-    print(f"Retorno:              {(final_equity / initial_cash - 1):.2%}")
-    print(f"Max drawdown:         {max_drawdown:.2%}")
+    metrics = compute_metrics(
+        equity_curve, broker.fills, initial_cash, periods_per_year=bars_per_year("1h")
+    )
+    print_metrics(metrics)
     print(f"Trades ejecutados:    {len(broker.fills)}")
     print(f"Kill switch activado: {risk_manager.halted} ({risk_manager.halt_reason or '-'})")
 
