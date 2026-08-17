@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import Sequence
 
 from core.types import Bar, Order, Side, Signal
 from strategy.base import Strategy
@@ -15,20 +16,36 @@ class TradingSession:
     strategy behaves identically whether it's replaying history or trading
     against a live feed — only the source of bars and the broker change.
 
+    Pass a single Strategy for a single-symbol session, or a sequence of
+    Strategy instances (one per symbol) for a multi-symbol portfolio. All
+    symbols share one RiskManager and one PaperBroker, so risk limits like
+    max_total_exposure_pct apply across the whole portfolio, not per
+    symbol -- and a bar for any symbol only drives that symbol's own
+    strategy and positions. Feed bars for different symbols interleaved in
+    any order, as long as the overall stream is chronologically sorted
+    (see backtest.merge.merge_bars).
+
     A signal generated from bar N's close is never filled on bar N itself —
     that would assume trading at a price the moment it prints, with zero
     latency and zero slippage. Instead it's queued and executed at bar N+1's
     open, the earliest realistic fill.
     """
 
-    def __init__(self, strategy: Strategy, risk_manager: RiskManager, broker: PaperBroker):
-        self.strategy = strategy
+    def __init__(
+        self,
+        strategy: Strategy | Sequence[Strategy],
+        risk_manager: RiskManager,
+        broker: PaperBroker,
+    ):
+        strategies = [strategy] if isinstance(strategy, Strategy) else list(strategy)
+        self.strategies = {s.symbol: s for s in strategies}
         self.risk_manager = risk_manager
         self.broker = broker
         self.equity_curve: list[tuple] = []
         self._current_day = None
-        self._pending_signal: Signal | None = None
+        self._pending_signals: dict[str, Signal | None] = {}
         self._pending_limit_orders: list[Order] = []
+        self._last_price: dict[str, float] = {}
 
     def process_bar(self, bar: Bar) -> None:
         if self._current_day is not None and bar.timestamp.date() != self._current_day:
@@ -40,14 +57,16 @@ class TradingSession:
         self._check_pending_limit_orders(bar)
         self._execute_pending_signal(bar)
 
-        self._pending_signal = self.strategy.on_bar(bar)
+        strategy = self.strategies.get(bar.symbol)
+        self._pending_signals[bar.symbol] = strategy.on_bar(bar) if strategy else None
 
-        equity = self.broker.account.equity({bar.symbol: bar.close})
+        self._last_price[bar.symbol] = bar.close
+        equity = self.broker.account.equity(self._last_price)
         self.equity_curve.append((bar.timestamp, equity))
 
     def _execute_pending_signal(self, bar: Bar) -> None:
-        signal = self._pending_signal
-        self._pending_signal = None
+        signal = self._pending_signals.get(bar.symbol)
+        self._pending_signals[bar.symbol] = None
         if signal is None:
             return
 

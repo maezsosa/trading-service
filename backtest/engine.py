@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from core.session import TradingSession
 from core.types import Bar
@@ -10,10 +10,19 @@ from broker.paper_broker import PaperBroker
 
 
 class Backtester:
-    """Replays historical bars through a TradingSession."""
+    """Replays historical bars through a TradingSession.
 
-    def __init__(self, strategy: Strategy, risk_manager: RiskManager, broker: PaperBroker):
-        self.strategy = strategy
+    Pass a single Strategy for a single-symbol backtest, or a sequence of
+    Strategy instances for a multi-symbol portfolio backtest -- feed it
+    bars merged chronologically across symbols (see backtest.merge.merge_bars).
+    """
+
+    def __init__(
+        self,
+        strategy: Strategy | Sequence[Strategy],
+        risk_manager: RiskManager,
+        broker: PaperBroker,
+    ):
         self.risk_manager = risk_manager
         self.broker = broker
         self._session = TradingSession(strategy, risk_manager, broker)

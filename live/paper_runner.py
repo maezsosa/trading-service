@@ -31,7 +31,7 @@ class PaperTradingRunner:
         self.data_provider = data_provider
 
     def run(self) -> None:
-        logger.info("Starting paper trading for %s", self.session.strategy.symbol)
+        logger.info("Starting paper trading for %s", ", ".join(self.session.strategies))
         try:
             for bar in self.data_provider.bars():
                 was_halted = self.session.risk_manager.halted
