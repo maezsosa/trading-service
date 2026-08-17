@@ -38,6 +38,17 @@ def parse_args() -> argparse.Namespace:
         help=f"tope de exposición combinada del portfolio (default: {RiskConfig().max_total_exposure_pct:.0%})",
     )
     parser.add_argument(
+        "--correlated-groups",
+        default=None,
+        help='símbolos que se mueven juntos, ej. "BTC/USDT:crypto,ETH/USDT:crypto"',
+    )
+    parser.add_argument(
+        "--max-group-exposure-pct",
+        type=float,
+        default=None,
+        help="tope de exposición combinada dentro de un mismo grupo correlacionado (requiere --correlated-groups)",
+    )
+    parser.add_argument(
         "--slippage-pct",
         type=float,
         default=0.0,
@@ -65,8 +76,19 @@ def main() -> None:
         MovingAverageCrossoverStrategy(symbol=symbol, fast_window=args.fast_window, slow_window=args.slow_window)
         for symbol in symbols
     ]
+    correlated_groups = {}
+    if args.correlated_groups:
+        for pair in args.correlated_groups.split(","):
+            symbol, _, group = pair.strip().partition(":")
+            correlated_groups[symbol] = group
+
     risk_manager = RiskManager(
-        RiskConfig(max_drawdown_pct=args.max_drawdown_pct, max_total_exposure_pct=args.max_total_exposure_pct)
+        RiskConfig(
+            max_drawdown_pct=args.max_drawdown_pct,
+            max_total_exposure_pct=args.max_total_exposure_pct,
+            correlated_groups=correlated_groups,
+            max_group_exposure_pct=args.max_group_exposure_pct,
+        )
     )
     broker = PaperBroker(initial_cash=args.cash, slippage_pct=args.slippage_pct)
     backtester = Backtester(strategy=strategies, risk_manager=risk_manager, broker=broker)

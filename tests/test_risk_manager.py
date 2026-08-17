@@ -86,3 +86,61 @@ def test_exposure_uses_each_position_own_price_not_the_new_signals_price():
     order = manager.validate(make_signal(), account, mark_price=100.0)
 
     assert order is None
+
+
+def test_group_exposure_caps_correlated_symbols_combined():
+    from core.types import Position
+
+    config = RiskConfig(
+        max_total_exposure_pct=1.0,  # total cap wide open on purpose
+        correlated_groups={"BTC": "crypto", "ETH": "crypto"},
+        max_group_exposure_pct=0.5,
+    )
+    manager = RiskManager(config)
+    # cash reduced by the BTC notional already spent, so equity works out to
+    # exactly 10,000 (5,000 cash + 5,000 BTC position), matching the pattern
+    # used in the exposure tests above.
+    account = AccountState(cash=5_000.0, equity_peak=10_000.0)
+    # BTC already has $5,000 notional -- exactly the group's 50% budget.
+    account.positions["BTC"] = Position(symbol="BTC", quantity=50.0, avg_entry_price=100.0)
+
+    signal = Signal(timestamp=datetime(2024, 1, 1), symbol="ETH", side=Side.BUY, stop_loss_pct=0.02)
+    order = manager.validate(signal, account, mark_price=100.0)
+
+    assert order is None  # group budget already fully used by BTC, despite total cap being wide open
+
+
+def test_group_exposure_does_not_constrain_symbols_outside_the_group():
+    from core.types import Position
+
+    config = RiskConfig(
+        max_total_exposure_pct=1.0,
+        correlated_groups={"BTC": "crypto", "ETH": "crypto"},
+        max_group_exposure_pct=0.5,
+    )
+    manager = RiskManager(config)
+    account = AccountState(cash=5_000.0, equity_peak=10_000.0)
+    account.positions["BTC"] = Position(symbol="BTC", quantity=50.0, avg_entry_price=100.0)
+
+    signal = Signal(timestamp=datetime(2024, 1, 1), symbol="SOL", side=Side.BUY, stop_loss_pct=0.02)
+    order = manager.validate(signal, account, mark_price=100.0)
+
+    assert order is not None  # SOL isn't in the "crypto" group, unaffected by BTC's group usage
+
+
+def test_group_exposure_disabled_by_default():
+    from core.types import Position
+
+    config = RiskConfig(
+        max_total_exposure_pct=1.0,
+        correlated_groups={"BTC": "crypto", "ETH": "crypto"},
+        # max_group_exposure_pct left at its default: None
+    )
+    manager = RiskManager(config)
+    account = AccountState(cash=10_000.0, equity_peak=10_000.0)
+    account.positions["BTC"] = Position(symbol="BTC", quantity=50.0, avg_entry_price=100.0)
+
+    signal = Signal(timestamp=datetime(2024, 1, 1), symbol="ETH", side=Side.BUY, stop_loss_pct=0.02)
+    order = manager.validate(signal, account, mark_price=100.0)
+
+    assert order is not None  # the group check is opt-in

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from core.types import AccountState, Order, Side, Signal
 
@@ -21,6 +21,16 @@ class RiskConfig:
     max_daily_loss_pct: float = 0.03
     # Hard kill switch: permanently halt (until manually reset) past this drawdown from peak equity.
     max_drawdown_pct: float = 0.15
+    # Maps symbol -> group name for symbols that move together (e.g. BTC/ETH
+    # both "crypto-majors"). A symbol not listed here is its own singleton
+    # group. Doesn't attempt to infer correlation statistically -- it's an
+    # explicit, honest declaration rather than a possibly-wrong estimate.
+    correlated_groups: dict[str, str] = field(default_factory=dict)
+    # Max fraction of equity allowed combined across one correlated group,
+    # tighter than max_total_exposure_pct so two correlated symbols can't
+    # each sit near the total cap and add up to a single undiversified bet.
+    # None disables this check entirely.
+    max_group_exposure_pct: float | None = None
 
 
 class RiskManager:
@@ -40,6 +50,9 @@ class RiskManager:
         """Manually clear the kill switch after a human has reviewed the account."""
         self.halted = False
         self.halt_reason = None
+
+    def _group_of(self, symbol: str) -> str:
+        return self.config.correlated_groups.get(symbol, symbol)
 
     def validate(self, signal: Signal, account: AccountState, mark_price: float) -> Order | None:
         equity = account.equity({signal.symbol: mark_price})
@@ -82,6 +95,18 @@ class RiskManager:
         if remaining_exposure <= 0:
             return None
         quantity = min(quantity, remaining_exposure / mark_price)
+
+        if self.config.max_group_exposure_pct is not None:
+            signal_group = self._group_of(signal.symbol)
+            current_group_exposure = sum(
+                abs(position.quantity) * (mark_price if position.symbol == signal.symbol else position.avg_entry_price)
+                for position in account.positions.values()
+                if position.is_open and self._group_of(position.symbol) == signal_group
+            )
+            remaining_group_exposure = equity * self.config.max_group_exposure_pct - current_group_exposure
+            if remaining_group_exposure <= 0:
+                return None
+            quantity = min(quantity, remaining_group_exposure / mark_price)
 
         if quantity <= 0:
             return None
