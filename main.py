@@ -18,6 +18,12 @@ def main() -> None:
         default=42,
         help="Seed para la serie sintética (mismo seed = mismos datos). Ej: --seed 7",
     )
+    parser.add_argument(
+        "--slippage-pct",
+        type=float,
+        default=0.0,
+        help="Slippage simulado por fill, como fracción (ej. 0.001 = 0.1%%)",
+    )
     args = parser.parse_args()
 
     symbol = "SYNTH/USD"
@@ -26,7 +32,7 @@ def main() -> None:
     data_provider = SyntheticDataProvider(symbol=symbol, num_bars=500, seed=args.seed)
     strategy = MovingAverageCrossoverStrategy(symbol=symbol, fast_window=10, slow_window=30)
     risk_manager = RiskManager(RiskConfig())
-    broker = PaperBroker(initial_cash=initial_cash)
+    broker = PaperBroker(initial_cash=initial_cash, slippage_pct=args.slippage_pct)
     backtester = Backtester(strategy=strategy, risk_manager=risk_manager, broker=broker)
 
     equity_curve = backtester.run(data_provider.bars())

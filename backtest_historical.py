@@ -25,6 +25,12 @@ def parse_args() -> argparse.Namespace:
         default=RiskConfig().max_drawdown_pct,
         help=f"kill switch: halt permanente al superar este drawdown desde el pico (default: {RiskConfig().max_drawdown_pct:.0%})",
     )
+    parser.add_argument(
+        "--slippage-pct",
+        type=float,
+        default=0.0,
+        help="slippage simulado por fill, como fracción (ej. 0.001 = 0.1%%)",
+    )
     parser.add_argument("--verbose", action="store_true", help="listar cada trade ejecutado")
     return parser.parse_args()
 
@@ -43,7 +49,7 @@ def main() -> None:
         symbol=args.symbol, fast_window=args.fast_window, slow_window=args.slow_window
     )
     risk_manager = RiskManager(RiskConfig(max_drawdown_pct=args.max_drawdown_pct))
-    broker = PaperBroker(initial_cash=args.cash)
+    broker = PaperBroker(initial_cash=args.cash, slippage_pct=args.slippage_pct)
     session = TradingSession(strategy, risk_manager, broker)
 
     halt_triggered_at: tuple[int, object] | None = None
