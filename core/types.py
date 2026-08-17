@@ -31,18 +31,25 @@ class Signal:
     symbol: str
     side: Side
     stop_loss_pct: float | None = None
+    limit_price: float | None = None
     reason: str = ""
 
 
 @dataclass(frozen=True)
 class Order:
-    """A sized, risk-approved instruction ready to send to a broker."""
+    """A sized, risk-approved instruction ready to send to a broker.
+
+    limit_price=None is a market order (fills immediately at whatever price
+    it's submitted with). If set, the order rests unfilled until a bar's
+    range touches limit_price, then fills at exactly that price.
+    """
 
     timestamp: datetime
     symbol: str
     side: Side
     quantity: float
     stop_loss_price: float | None = None
+    limit_price: float | None = None
 
 
 @dataclass

@@ -96,4 +96,5 @@ class RiskManager:
             side=signal.side,
             quantity=quantity,
             stop_loss_price=stop_loss_price,
+            limit_price=signal.limit_price,
         )

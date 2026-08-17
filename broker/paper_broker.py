@@ -18,10 +18,15 @@ class PaperBroker(Broker):
         self.slippage_pct = slippage_pct
         self.fills: list[Fill] = []
 
-    def submit_order(self, order: Order, mark_price: float) -> Fill:
+    def submit_order(self, order: Order, mark_price: float, apply_slippage: bool = True) -> Fill:
         # Slippage always works against the trader: a buy fills higher than
-        # the quoted price, a sell fills lower -- never in your favor.
-        slippage_multiplier = 1 + self.slippage_pct if order.side == Side.BUY else 1 - self.slippage_pct
+        # the quoted price, a sell fills lower -- never in your favor. Not
+        # applied to a limit-order fill: that price is a guarantee, never
+        # worse than what was specified.
+        if apply_slippage:
+            slippage_multiplier = 1 + self.slippage_pct if order.side == Side.BUY else 1 - self.slippage_pct
+        else:
+            slippage_multiplier = 1.0
         execution_price = mark_price * slippage_multiplier
 
         fee = execution_price * order.quantity * self.fee_pct

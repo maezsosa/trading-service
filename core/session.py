@@ -28,6 +28,7 @@ class TradingSession:
         self.equity_curve: list[tuple] = []
         self._current_day = None
         self._pending_signal: Signal | None = None
+        self._pending_limit_orders: list[Order] = []
 
     def process_bar(self, bar: Bar) -> None:
         if self._current_day is not None and bar.timestamp.date() != self._current_day:
@@ -35,6 +36,7 @@ class TradingSession:
         self._current_day = bar.timestamp.date()
 
         self._check_stop_loss(bar)
+        self._check_pending_limit_orders(bar)
         self._execute_pending_signal(bar)
 
         self._pending_signal = self.strategy.on_bar(bar)
@@ -48,12 +50,40 @@ class TradingSession:
         if signal is None:
             return
 
+        # A fresh signal supersedes any stale resting limit order left over
+        # from an earlier, now-outdated signal on the same symbol.
+        self._pending_limit_orders = [
+            order for order in self._pending_limit_orders if order.symbol != signal.symbol
+        ]
+
         execution_price = bar.open
         self._flatten_opposing_position(signal, execution_price, bar.timestamp)
         order = self.risk_manager.validate(signal, self.broker.account, execution_price)
-        if order is not None:
-            order = replace(order, timestamp=bar.timestamp)
+        if order is None:
+            return
+
+        order = replace(order, timestamp=bar.timestamp)
+        if order.limit_price is not None:
+            self._pending_limit_orders.append(order)
+        else:
             self.broker.submit_order(order, execution_price)
+
+    def _check_pending_limit_orders(self, bar: Bar) -> None:
+        still_pending = []
+        for order in self._pending_limit_orders:
+            if order.symbol != bar.symbol:
+                still_pending.append(order)
+                continue
+
+            triggered = (order.side == Side.BUY and bar.low <= order.limit_price) or (
+                order.side == Side.SELL and bar.high >= order.limit_price
+            )
+            if triggered:
+                self.broker.submit_order(order, order.limit_price, apply_slippage=False)
+            else:
+                still_pending.append(order)
+
+        self._pending_limit_orders = still_pending
 
     def _flatten_opposing_position(self, signal: Signal, mark_price: float, timestamp) -> None:
         """Close any existing position that sits opposite to a new signal.
