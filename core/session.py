@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from core.types import Bar, Order, Side
+from dataclasses import replace
+
+from core.types import Bar, Order, Side, Signal
 from strategy.base import Strategy
 from risk.manager import RiskManager
 from broker.paper_broker import PaperBroker
@@ -12,6 +14,11 @@ class TradingSession:
     Shared by the historical Backtester and the live PaperTradingRunner so a
     strategy behaves identically whether it's replaying history or trading
     against a live feed — only the source of bars and the broker change.
+
+    A signal generated from bar N's close is never filled on bar N itself —
+    that would assume trading at a price the moment it prints, with zero
+    latency and zero slippage. Instead it's queued and executed at bar N+1's
+    open, the earliest realistic fill.
     """
 
     def __init__(self, strategy: Strategy, risk_manager: RiskManager, broker: PaperBroker):
@@ -20,6 +27,7 @@ class TradingSession:
         self.broker = broker
         self.equity_curve: list[tuple] = []
         self._current_day = None
+        self._pending_signal: Signal | None = None
 
     def process_bar(self, bar: Bar) -> None:
         if self._current_day is not None and bar.timestamp.date() != self._current_day:
@@ -27,15 +35,52 @@ class TradingSession:
         self._current_day = bar.timestamp.date()
 
         self._check_stop_loss(bar)
+        self._execute_pending_signal(bar)
 
-        signal = self.strategy.on_bar(bar)
-        if signal is not None:
-            order = self.risk_manager.validate(signal, self.broker.account, bar.close)
-            if order is not None:
-                self.broker.submit_order(order, bar.close)
+        self._pending_signal = self.strategy.on_bar(bar)
 
         equity = self.broker.account.equity({bar.symbol: bar.close})
         self.equity_curve.append((bar.timestamp, equity))
+
+    def _execute_pending_signal(self, bar: Bar) -> None:
+        signal = self._pending_signal
+        self._pending_signal = None
+        if signal is None:
+            return
+
+        execution_price = bar.open
+        self._flatten_opposing_position(signal, execution_price, bar.timestamp)
+        order = self.risk_manager.validate(signal, self.broker.account, execution_price)
+        if order is not None:
+            order = replace(order, timestamp=bar.timestamp)
+            self.broker.submit_order(order, execution_price)
+
+    def _flatten_opposing_position(self, signal: Signal, mark_price: float, timestamp) -> None:
+        """Close any existing position that sits opposite to a new signal.
+
+        Sized to exactly the open quantity (not the risk-based sizing
+        formula) so a reversal always nets to zero instead of leaving a
+        stray residual position behind. The fresh entry, if any, is then
+        sized by risk_manager.validate() from a clean, flat base.
+        """
+        position = self.broker.account.positions.get(signal.symbol)
+        if position is None or not position.is_open:
+            return
+
+        is_opposing = (position.quantity > 0 and signal.side == Side.SELL) or (
+            position.quantity < 0 and signal.side == Side.BUY
+        )
+        if not is_opposing:
+            return
+
+        closing_side = Side.SELL if position.quantity > 0 else Side.BUY
+        order = Order(
+            timestamp=timestamp,
+            symbol=signal.symbol,
+            side=closing_side,
+            quantity=abs(position.quantity),
+        )
+        self.broker.submit_order(order, mark_price)
 
     def _check_stop_loss(self, bar: Bar) -> None:
         position = self.broker.account.positions.get(bar.symbol)
