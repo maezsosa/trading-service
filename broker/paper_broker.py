@@ -41,6 +41,7 @@ class PaperBroker(Broker):
                 total_cost / position.quantity if position.quantity != 0 else 0.0
             )
             position.stop_loss_price = order.stop_loss_price
+            position.take_profit_price = order.take_profit_price
             self.account.cash -= signed_qty * execution_price + fee
         else:
             closing_qty = min(abs(signed_qty), abs(position.quantity))
@@ -52,11 +53,13 @@ class PaperBroker(Broker):
             if position.quantity == 0:
                 position.avg_entry_price = 0.0
                 position.stop_loss_price = None
+                position.take_profit_price = None
             else:
                 # Order size exceeded the open position: the remainder opens
                 # a new position in the opposite direction at the fill price.
                 position.avg_entry_price = execution_price
                 position.stop_loss_price = order.stop_loss_price
+                position.take_profit_price = order.take_profit_price
 
         fill = Fill(
             timestamp=order.timestamp,

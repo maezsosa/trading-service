@@ -36,6 +36,7 @@ class TradingSession:
         self._current_day = bar.timestamp.date()
 
         self._check_stop_loss(bar)
+        self._check_take_profit(bar)
         self._check_pending_limit_orders(bar)
         self._execute_pending_signal(bar)
 
@@ -131,3 +132,23 @@ class TradingSession:
             quantity=abs(position.quantity),
         )
         self.broker.submit_order(order, position.stop_loss_price)
+
+    def _check_take_profit(self, bar: Bar) -> None:
+        position = self.broker.account.positions.get(bar.symbol)
+        if position is None or not position.is_open or position.take_profit_price is None:
+            return
+
+        hit = (position.quantity > 0 and bar.high >= position.take_profit_price) or (
+            position.quantity < 0 and bar.low <= position.take_profit_price
+        )
+        if not hit:
+            return
+
+        closing_side = Side.SELL if position.quantity > 0 else Side.BUY
+        order = Order(
+            timestamp=bar.timestamp,
+            symbol=bar.symbol,
+            side=closing_side,
+            quantity=abs(position.quantity),
+        )
+        self.broker.submit_order(order, position.take_profit_price)

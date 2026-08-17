@@ -31,6 +31,7 @@ class Signal:
     symbol: str
     side: Side
     stop_loss_pct: float | None = None
+    take_profit_pct: float | None = None
     limit_price: float | None = None
     reason: str = ""
 
@@ -49,6 +50,7 @@ class Order:
     side: Side
     quantity: float
     stop_loss_price: float | None = None
+    take_profit_price: float | None = None
     limit_price: float | None = None
 
 
@@ -69,6 +71,7 @@ class Position:
     quantity: float = 0.0
     avg_entry_price: float = 0.0
     stop_loss_price: float | None = None
+    take_profit_price: float | None = None
 
     @property
     def is_open(self) -> bool:

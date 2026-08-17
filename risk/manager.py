@@ -90,11 +90,21 @@ class RiskManager:
             mark_price - stop_distance if signal.side == Side.BUY else mark_price + stop_distance
         )
 
+        take_profit_price = None
+        if signal.take_profit_pct:
+            take_profit_distance = mark_price * signal.take_profit_pct
+            take_profit_price = (
+                mark_price + take_profit_distance
+                if signal.side == Side.BUY
+                else mark_price - take_profit_distance
+            )
+
         return Order(
             timestamp=signal.timestamp,
             symbol=signal.symbol,
             side=signal.side,
             quantity=quantity,
             stop_loss_price=stop_loss_price,
+            take_profit_price=take_profit_price,
             limit_price=signal.limit_price,
         )
