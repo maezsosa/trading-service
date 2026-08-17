@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass
+from typing import Iterable, Sequence
 
-from core.types import Fill
+from core.types import Bar, Fill
 
 _SECONDS_PER_UNIT = {"m": 60, "h": 3600, "d": 86400, "w": 604800}
 _SECONDS_PER_YEAR = 365 * 86400  # crypto markets trade 24/7, unlike max_bars-style equities conventions
@@ -97,6 +98,32 @@ def compute_metrics(
         avg_loss=avg_loss,
         profit_factor=profit_factor,
     )
+
+
+def buy_and_hold_equity_curve(
+    bars: Iterable[Bar], symbols: Sequence[str], initial_cash: float
+) -> list[tuple]:
+    """What initial_cash would be worth just buying and holding, for comparison.
+
+    Splits initial_cash equally across symbols, "buying" each the moment its
+    first bar appears (at that bar's open) and marking to the last known
+    close from then on -- same last-known-price approach TradingSession uses
+    for its own equity curve, so the two are computed consistently.
+    """
+    cash_per_symbol = initial_cash / len(symbols) if symbols else 0.0
+    quantities: dict[str, float] = {}
+    last_price: dict[str, float] = {}
+    curve: list[tuple] = []
+
+    for bar in bars:
+        if bar.symbol not in quantities and bar.symbol in symbols:
+            quantities[bar.symbol] = cash_per_symbol / bar.open if bar.open > 0 else 0.0
+        if bar.symbol in quantities:
+            last_price[bar.symbol] = bar.close
+        equity = sum(quantities[symbol] * last_price[symbol] for symbol in quantities)
+        curve.append((bar.timestamp, equity))
+
+    return curve
 
 
 def _fmt(value: float | None, suffix: str = "", decimals: int = 2) -> str:

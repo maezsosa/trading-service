@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from backtest.metrics import bars_per_year, compute_metrics, print_metrics
+from backtest.metrics import bars_per_year, buy_and_hold_equity_curve, compute_metrics, print_metrics
 from broker.paper_broker import PaperBroker
 from core.session import TradingSession
 from data.ccxt_provider import CCXTHistoricalDataProvider
@@ -53,8 +53,9 @@ def main() -> None:
     broker = PaperBroker(initial_cash=args.cash, slippage_pct=args.slippage_pct)
     session = TradingSession(strategy, risk_manager, broker)
 
+    bars = list(data_provider.bars())  # materialized once so it can also feed the buy-and-hold curve
     halt_triggered_at: tuple[int, object] | None = None
-    for bar_number, bar in enumerate(data_provider.bars(), start=1):
+    for bar_number, bar in enumerate(bars, start=1):
         was_halted = risk_manager.halted
         session.process_bar(bar)
         if risk_manager.halted and not was_halted:
@@ -77,6 +78,14 @@ def main() -> None:
     if halt_triggered_at:
         bar_number, timestamp = halt_triggered_at
         print(f"  -> activado en barra #{bar_number} ({timestamp}), quedaron {len(equity_curve) - bar_number} barras sin operar")
+
+    bh_curve = buy_and_hold_equity_curve(bars, [args.symbol], args.cash)
+    bh_metrics = compute_metrics(bh_curve, [], args.cash, periods_per_year=bars_per_year(args.timeframe))
+    print()
+    print(f"Buy-and-hold ({args.symbol}):")
+    print(f"  Retorno:             {bh_metrics.total_return_pct:.2f}%")
+    print(f"  Max drawdown:        {bh_metrics.max_drawdown_pct:.2f}%")
+    print(f"  vs. estrategia:      {metrics.total_return_pct - bh_metrics.total_return_pct:+.2f} puntos de retorno")
 
     if args.verbose:
         print()

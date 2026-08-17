@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
-from backtest.metrics import bars_per_year, compute_metrics
-from core.types import Fill, Side
+from backtest.metrics import bars_per_year, buy_and_hold_equity_curve, compute_metrics
+from core.types import Bar, Fill, Side
 
 
 def make_fill(realized_pnl: float | None) -> Fill:
@@ -75,3 +75,37 @@ def test_sharpe_and_sortino_none_with_fewer_than_two_bars():
 
     assert metrics.sharpe_ratio is None
     assert metrics.sortino_ratio is None
+
+
+def make_bar(symbol: str, timestamp: datetime, open_: float, close: float) -> Bar:
+    return Bar(
+        timestamp=timestamp, symbol=symbol, open=open_, high=close, low=open_, close=close, volume=1.0
+    )
+
+
+def test_buy_and_hold_tracks_a_single_symbols_price():
+    t0 = datetime(2024, 1, 1)
+    bars = [
+        make_bar("TEST", t0, open_=100.0, close=100.0),
+        make_bar("TEST", t0 + timedelta(hours=1), open_=100.0, close=110.0),
+        make_bar("TEST", t0 + timedelta(hours=2), open_=110.0, close=120.0),
+    ]
+
+    curve = buy_and_hold_equity_curve(bars, symbols=["TEST"], initial_cash=10_000.0)
+
+    assert [equity for _, equity in curve] == pytest.approx([10_000.0, 11_000.0, 12_000.0])
+
+
+def test_buy_and_hold_splits_cash_evenly_across_symbols():
+    t0 = datetime(2024, 1, 1)
+    bars = [
+        make_bar("AAA", t0, open_=100.0, close=100.0),
+        make_bar("BBB", t0 + timedelta(hours=1), open_=200.0, close=200.0),
+        make_bar("AAA", t0 + timedelta(hours=2), open_=100.0, close=150.0),  # AAA +50%
+        make_bar("BBB", t0 + timedelta(hours=3), open_=200.0, close=100.0),  # BBB -50%
+    ]
+
+    curve = buy_and_hold_equity_curve(bars, symbols=["AAA", "BBB"], initial_cash=10_000.0)
+
+    # $5k in each symbol; a +50% and a -50% leg cancel out back to $10k.
+    assert curve[-1][1] == pytest.approx(10_000.0)

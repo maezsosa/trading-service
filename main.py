@@ -7,7 +7,7 @@ from strategy.moving_average_crossover import MovingAverageCrossoverStrategy
 from risk.manager import RiskConfig, RiskManager
 from broker.paper_broker import PaperBroker
 from backtest.engine import Backtester
-from backtest.metrics import bars_per_year, compute_metrics, print_metrics
+from backtest.metrics import bars_per_year, buy_and_hold_equity_curve, compute_metrics, print_metrics
 
 
 def main() -> None:
@@ -36,7 +36,8 @@ def main() -> None:
     broker = PaperBroker(initial_cash=initial_cash, slippage_pct=args.slippage_pct)
     backtester = Backtester(strategy=strategy, risk_manager=risk_manager, broker=broker)
 
-    equity_curve = backtester.run(data_provider.bars())
+    bars = list(data_provider.bars())  # materialized once so it can also feed the buy-and-hold curve
+    equity_curve = backtester.run(bars)
     final_equity = equity_curve[-1][1] if equity_curve else initial_cash
 
     print(f"Seed:                 {args.seed}")
@@ -49,6 +50,14 @@ def main() -> None:
     print_metrics(metrics)
     print(f"Trades ejecutados:    {len(broker.fills)}")
     print(f"Kill switch activado: {risk_manager.halted} ({risk_manager.halt_reason or '-'})")
+
+    bh_curve = buy_and_hold_equity_curve(bars, [symbol], initial_cash)
+    bh_metrics = compute_metrics(bh_curve, [], initial_cash, periods_per_year=bars_per_year("1h"))
+    print()
+    print(f"Buy-and-hold ({symbol}):")
+    print(f"  Retorno:             {bh_metrics.total_return_pct:.2f}%")
+    print(f"  Max drawdown:        {bh_metrics.max_drawdown_pct:.2f}%")
+    print(f"  vs. estrategia:      {metrics.total_return_pct - bh_metrics.total_return_pct:+.2f} puntos de retorno")
 
     if args.verbose:
         print()

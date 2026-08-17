@@ -4,7 +4,7 @@ import argparse
 
 from backtest.engine import Backtester
 from backtest.merge import merge_bars
-from backtest.metrics import bars_per_year, compute_metrics, print_metrics
+from backtest.metrics import bars_per_year, buy_and_hold_equity_curve, compute_metrics, print_metrics
 from broker.paper_broker import PaperBroker
 from data.ccxt_provider import CCXTHistoricalDataProvider
 from risk.manager import RiskConfig, RiskManager
@@ -93,7 +93,7 @@ def main() -> None:
     broker = PaperBroker(initial_cash=args.cash, slippage_pct=args.slippage_pct)
     backtester = Backtester(strategy=strategies, risk_manager=risk_manager, broker=broker)
 
-    bars = merge_bars(provider.bars() for provider in data_providers)
+    bars = list(merge_bars(provider.bars() for provider in data_providers))
     equity_curve = backtester.run(bars)
 
     final_equity = equity_curve[-1][1] if equity_curve else args.cash
@@ -109,6 +109,14 @@ def main() -> None:
     print_metrics(metrics)
     print(f"Trades ejecutados:    {len(broker.fills)}")
     print(f"Kill switch activado: {risk_manager.halted} ({risk_manager.halt_reason or '-'})")
+
+    bh_curve = buy_and_hold_equity_curve(bars, symbols, args.cash)
+    bh_metrics = compute_metrics(bh_curve, [], args.cash, periods_per_year=bars_per_year(args.timeframe))
+    print()
+    print(f"Buy-and-hold (cash repartido parejo entre {', '.join(symbols)}):")
+    print(f"  Retorno:             {bh_metrics.total_return_pct:.2f}%")
+    print(f"  Max drawdown:        {bh_metrics.max_drawdown_pct:.2f}%")
+    print(f"  vs. estrategia:      {metrics.total_return_pct - bh_metrics.total_return_pct:+.2f} puntos de retorno")
 
     print()
     print("Trades por símbolo:")
