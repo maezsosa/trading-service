@@ -70,3 +70,19 @@ def test_max_total_exposure_blocks_when_already_fully_deployed():
     order = manager.validate(make_signal(), account, mark_price=100.0)
 
     assert order is None
+
+
+def test_exposure_uses_each_position_own_price_not_the_new_signals_price():
+    from core.types import Position
+
+    # OTHER is priced at 1000/unit (real notional 50_000), far above the
+    # incoming signal's mark_price for TEST. Exposure must be computed off
+    # OTHER's own price, not TEST's mark_price, or it's wildly understated.
+    config = RiskConfig(max_total_exposure_pct=0.5)
+    manager = RiskManager(config)
+    account = AccountState(cash=5_000.0, equity_peak=10_000.0)
+    account.positions["OTHER"] = Position(symbol="OTHER", quantity=50.0, avg_entry_price=1000.0)
+
+    order = manager.validate(make_signal(), account, mark_price=100.0)
+
+    assert order is None

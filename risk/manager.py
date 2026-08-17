@@ -74,7 +74,7 @@ class RiskManager:
         quantity = min(quantity, max_position_value / mark_price)
 
         current_exposure = sum(
-            abs(position.quantity) * mark_price
+            abs(position.quantity) * (mark_price if position.symbol == signal.symbol else position.avg_entry_price)
             for position in account.positions.values()
             if position.is_open
         )

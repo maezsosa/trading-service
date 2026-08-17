@@ -40,6 +40,11 @@ class PaperBroker(Broker):
             if position.quantity == 0:
                 position.avg_entry_price = 0.0
                 position.stop_loss_price = None
+            else:
+                # Order size exceeded the open position: the remainder opens
+                # a new position in the opposite direction at the fill price.
+                position.avg_entry_price = mark_price
+                position.stop_loss_price = order.stop_loss_price
 
         fill = Fill(
             timestamp=order.timestamp,
