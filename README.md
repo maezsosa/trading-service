@@ -46,16 +46,16 @@ garantiza eso.
 ## Uso rápido
 
 ```bash
-pip install -r requirements.txt
+poetry install
 
 # Backtest de ejemplo (datos sintéticos + cruce de medias móviles)
-python main.py
+poetry run python main.py
 
 # Paper trading en vivo contra Binance (datos públicos, sin API keys)
-python paper_trade.py --symbol BTC/USDT --timeframe 1m --poll-interval 30
+poetry run python paper_trade.py --symbol BTC/USDT --timeframe 1m --poll-interval 30
 
 # Tests (no pegan a la red real: usan un exchange ccxt "fake" inyectado)
-pytest
+poetry run pytest
 ```
 
 `paper_trade.py` acepta `--exchange` (cualquier id soportado por ccxt),

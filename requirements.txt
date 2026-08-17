@@ -1,5 +1,0 @@
-pytest>=7.0
-ccxt>=4.0
-
-# Cuando se agregue análisis/series más pesado, sumar por ejemplo:
-# pandas      # manejo de series de datos históricas

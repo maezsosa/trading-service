@@ -1,0 +1,25 @@
+[project]
+name = "trading-service"
+version = "0.1.0"
+description = "Esqueleto de un sistema de trading automatizado"
+authors = [
+    {name = "Matias Sosa",email = "matias.sosa@poincenot.com"}
+]
+readme = "README.md"
+requires-python = "^3.12"
+dependencies = [
+    "ccxt (>=4.0)"
+]
+
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=7.0)"
+]
