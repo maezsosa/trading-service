@@ -21,6 +21,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fast-window", type=int, default=10)
     parser.add_argument("--slow-window", type=int, default=30)
     parser.add_argument(
+        "--min-separation-pct",
+        type=float,
+        default=0.0,
+        help="filtro anti-whipsaw: separación mínima entre fast/slow SMA para confirmar la señal (ej. 0.01 = 1%%)",
+    )
+    parser.add_argument(
         "--max-drawdown-pct",
         type=float,
         default=RiskConfig().max_drawdown_pct,
@@ -47,7 +53,10 @@ def main() -> None:
         exchange_id=args.exchange,
     )
     strategy = MovingAverageCrossoverStrategy(
-        symbol=args.symbol, fast_window=args.fast_window, slow_window=args.slow_window
+        symbol=args.symbol,
+        fast_window=args.fast_window,
+        slow_window=args.slow_window,
+        min_separation_pct=args.min_separation_pct,
     )
     risk_manager = RiskManager(RiskConfig(max_drawdown_pct=args.max_drawdown_pct))
     broker = PaperBroker(initial_cash=args.cash, slippage_pct=args.slippage_pct)

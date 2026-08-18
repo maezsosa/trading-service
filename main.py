@@ -25,13 +25,21 @@ def main() -> None:
         default=0.0,
         help="Slippage simulado por fill, como fracción (ej. 0.001 = 0.1%%)",
     )
+    parser.add_argument(
+        "--min-separation-pct",
+        type=float,
+        default=0.0,
+        help="Filtro anti-whipsaw: separación mínima entre fast/slow SMA para confirmar la señal (ej. 0.01 = 1%%)",
+    )
     args = parser.parse_args()
 
     symbol = "SYNTH/USD"
     initial_cash = 10_000.0
 
     data_provider = SyntheticDataProvider(symbol=symbol, num_bars=500, seed=args.seed)
-    strategy = MovingAverageCrossoverStrategy(symbol=symbol, fast_window=10, slow_window=30)
+    strategy = MovingAverageCrossoverStrategy(
+        symbol=symbol, fast_window=10, slow_window=30, min_separation_pct=args.min_separation_pct
+    )
     risk_manager = RiskManager(RiskConfig())
     broker = PaperBroker(initial_cash=initial_cash, slippage_pct=args.slippage_pct)
     backtester = Backtester(strategy=strategy, risk_manager=risk_manager, broker=broker)
