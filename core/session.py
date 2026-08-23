@@ -48,18 +48,30 @@ class TradingSession:
         self._last_price: dict[str, float] = {}
 
     def process_bar(self, bar: Bar) -> None:
+        # Cambio de día: solo resetea el contador de pérdida diaria del risk
+        # manager. No toca posiciones abiertas -- esas siguen como estaban.
         if self._current_day is not None and bar.timestamp.date() != self._current_day:
             self.broker.account.realized_pnl_today = 0.0
         self._current_day = bar.timestamp.date()
 
+        # Fase 1: resolver lo que ya estaba abierto, usando el rango
+        # completo (high/low) de ESTA barra.
         self._check_stop_loss(bar)
         self._check_take_profit(bar)
         self._check_pending_limit_orders(bar)
+
+        # Fase 2: ejecutar la señal que la estrategia generó en la barra
+        # ANTERIOR (a partir de su close), al precio de open de esta barra
+        # -- el fill más temprano y realista posible, sin look-ahead bias.
         self._execute_pending_signal(bar)
 
+        # Fase 3: preguntarle a la estrategia qué hacer con el close de
+        # ESTA barra. Esa señal no se ejecuta ahora: queda pendiente y se
+        # resuelve recién en la Fase 2 de la próxima barra.
         strategy = self.strategies.get(bar.symbol)
         self._pending_signals[bar.symbol] = strategy.on_bar(bar) if strategy else None
 
+        # Fase 4: registrar el equity de la cuenta a precio de close de esta barra.
         self._last_price[bar.symbol] = bar.close
         equity = self.broker.account.equity(self._last_price)
         self.equity_curve.append((bar.timestamp, equity))
