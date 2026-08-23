@@ -36,6 +36,9 @@ class PaperBroker(Broker):
         realized: float | None = None
         same_direction = position.quantity == 0 or (position.quantity > 0) == (signed_qty > 0)
         if same_direction:
+            # Abrir o sumar a favor de la posición: el avg_entry_price nuevo
+            # es un promedio ponderado entre lo que ya había y lo que se
+            # suma ahora -- no hay PnL realizado, todavía no se cerró nada.
             total_cost = position.avg_entry_price * position.quantity + execution_price * signed_qty
             position.quantity += signed_qty
             position.avg_entry_price = (
@@ -45,6 +48,8 @@ class PaperBroker(Broker):
             position.take_profit_price = order.take_profit_price
             self.account.cash -= signed_qty * execution_price + fee
         else:
+            # Orden en contra de la posición existente: cierra (total o
+            # parcialmente) contra avg_entry_price, ahí sí hay PnL realizado.
             closing_qty = min(abs(signed_qty), abs(position.quantity))
             direction = 1 if position.quantity > 0 else -1
             realized = closing_qty * (execution_price - position.avg_entry_price) * direction

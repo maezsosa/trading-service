@@ -58,6 +58,8 @@ class RiskManager:
         equity = account.equity({signal.symbol: mark_price})
         account.equity_peak = max(account.equity_peak, equity)
 
+        # Kill switch primero: es permanente (hasta reset_halt() manual), así
+        # que si ya se activó no tiene sentido seguir evaluando nada más.
         if account.equity_peak > 0:
             drawdown = (account.equity_peak - equity) / account.equity_peak
             if drawdown >= self.config.max_drawdown_pct:
@@ -67,6 +69,8 @@ class RiskManager:
         if self.halted:
             return None
 
+        # Pausa diaria: a diferencia del kill switch, esto se resetea solo al
+        # otro día (ver TradingSession.process_bar) -- no marca self.halted.
         if account.equity_peak > 0 and account.realized_pnl_today < 0:
             daily_loss_pct = abs(account.realized_pnl_today) / account.equity_peak
             if daily_loss_pct >= self.config.max_daily_loss_pct:
@@ -80,12 +84,21 @@ class RiskManager:
         if stop_distance <= 0:
             return None
 
+        # Sizing por riesgo, no por capital: la cantidad se calcula para que
+        # SI se toca el stop, la pérdida sea exactamente risk_per_trade_pct
+        # del equity -- no un tamaño fijo de unidades ni un % fijo de capital.
+        # Un stop más ajustado (stop_distance chico) da una posición más
+        # grande; un stop más flojo, una más chica, para el mismo riesgo.
         risk_amount = equity * self.config.risk_per_trade_pct
         quantity = risk_amount / stop_distance
 
         max_position_value = equity * self.config.max_position_pct
         quantity = min(quantity, max_position_value / mark_price)
 
+        # Cada posición se valúa a SU PROPIO precio (avg_entry_price), no al
+        # mark_price de la señal actual -- si no, la exposición de cualquier
+        # otro símbolo quedaría mal calculada apenas su precio se aleje del
+        # de la señal que se está evaluando ahora mismo (bug ya corregido).
         current_exposure = sum(
             abs(position.quantity) * (mark_price if position.symbol == signal.symbol else position.avg_entry_price)
             for position in account.positions.values()
@@ -96,6 +109,8 @@ class RiskManager:
             return None
         quantity = min(quantity, remaining_exposure / mark_price)
 
+        # Mismo criterio de valuación que arriba, pero sumando solo las
+        # posiciones del mismo grupo correlacionado que la señal.
         if self.config.max_group_exposure_pct is not None:
             signal_group = self._group_of(signal.symbol)
             current_group_exposure = sum(

@@ -88,6 +88,10 @@ class TradingSession:
             order for order in self._pending_limit_orders if order.symbol != signal.symbol
         ]
 
+        # Cerrar primero, sizear después: si no se flatteara acá, el sizing
+        # del risk manager partiría de una cuenta que todavía "cree" que
+        # tiene la posición vieja abierta, mezclando el riesgo de la
+        # posición que se cierra con el de la que se abre.
         execution_price = bar.open
         self._flatten_opposing_position(signal, execution_price, bar.timestamp)
         order = self.risk_manager.validate(signal, self.broker.account, execution_price)

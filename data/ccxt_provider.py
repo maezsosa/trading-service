@@ -111,6 +111,10 @@ class CCXTLiveDataProvider(MarketDataProvider):
                 continue
 
             if len(ohlcv) >= 2:
+                # Con limit=2 el exchange devuelve [penúltima, última]. La
+                # última suele seguir en formación (no cerró todavía), así
+                # que la penúltima (ohlcv[-2]) es la última vela realmente
+                # cerrada -- la que sí queremos emitir.
                 closed_candle = ohlcv[-2]
                 if closed_candle[0] != last_timestamp_ms:
                     last_timestamp_ms = closed_candle[0]
