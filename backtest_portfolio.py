@@ -44,6 +44,18 @@ def parse_args() -> argparse.Namespace:
         help=f"tope de exposición combinada del portfolio (default: {RiskConfig().max_total_exposure_pct:.0%})",
     )
     parser.add_argument(
+        "--max-position-pct",
+        type=float,
+        default=RiskConfig().max_position_pct,
+        help=f"tope de exposición por símbolo individual (default: {RiskConfig().max_position_pct:.0%})",
+    )
+    parser.add_argument(
+        "--risk-per-trade-pct",
+        type=float,
+        default=RiskConfig().risk_per_trade_pct,
+        help=f"fracción de equity arriesgada por trade, vía la distancia al stop (default: {RiskConfig().risk_per_trade_pct:.0%})",
+    )
+    parser.add_argument(
         "--correlated-groups",
         default=None,
         help='símbolos que se mueven juntos, ej. "BTC/USDT:crypto,ETH/USDT:crypto"',
@@ -97,6 +109,8 @@ def main() -> None:
         RiskConfig(
             max_drawdown_pct=args.max_drawdown_pct,
             max_total_exposure_pct=args.max_total_exposure_pct,
+            max_position_pct=args.max_position_pct,
+            risk_per_trade_pct=args.risk_per_trade_pct,
             correlated_groups=correlated_groups,
             max_group_exposure_pct=args.max_group_exposure_pct,
         )
