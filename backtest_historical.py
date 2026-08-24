@@ -33,6 +33,18 @@ def parse_args() -> argparse.Namespace:
         help=f"kill switch: halt permanente al superar este drawdown desde el pico (default: {RiskConfig().max_drawdown_pct:.0%})",
     )
     parser.add_argument(
+        "--max-position-pct",
+        type=float,
+        default=RiskConfig().max_position_pct,
+        help=f"tope de exposición en este símbolo (default: {RiskConfig().max_position_pct:.0%})",
+    )
+    parser.add_argument(
+        "--risk-per-trade-pct",
+        type=float,
+        default=RiskConfig().risk_per_trade_pct,
+        help=f"fracción de equity arriesgada por trade, vía la distancia al stop (default: {RiskConfig().risk_per_trade_pct:.0%})",
+    )
+    parser.add_argument(
         "--slippage-pct",
         type=float,
         default=0.0,
@@ -58,7 +70,14 @@ def main() -> None:
         slow_window=args.slow_window,
         min_separation_pct=args.min_separation_pct,
     )
-    risk_manager = RiskManager(RiskConfig(max_drawdown_pct=args.max_drawdown_pct))
+    risk_manager = RiskManager(
+        RiskConfig(
+            max_drawdown_pct=args.max_drawdown_pct,
+            max_position_pct=args.max_position_pct,
+            max_total_exposure_pct=max(args.max_position_pct, RiskConfig().max_total_exposure_pct),
+            risk_per_trade_pct=args.risk_per_trade_pct,
+        )
+    )
     broker = PaperBroker(initial_cash=args.cash, slippage_pct=args.slippage_pct)
     session = TradingSession(strategy, risk_manager, broker)
 
