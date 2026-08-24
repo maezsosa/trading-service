@@ -119,7 +119,14 @@ paper-trading real.
   ejecución real — el resto del sistema no cambia.
 - **Persistencia**: guardar señales, órdenes, fills y equity curve (DB o
   archivo) para poder auditar y depurar corridas en vivo más allá de los
-  logs de consola.
+  logs de consola. También resuelve la continuidad entre reinicios de
+  `paper_trade.py`: hoy el estado de cada estrategia (ej. el `deque` de
+  cierres de `MovingAverageCrossoverStrategy`) vive solo en memoria del
+  proceso, así que un reinicio lo pierde y hay que esperar `slow_window`
+  barras nuevas antes de volver a poder operar. Con histórico persistido,
+  al arrancar se reconstruye ese estado en memoria a partir de las últimas
+  N barras guardadas -- el cálculo del indicador se queda en memoria igual
+  que ahora, la base solo resuelve el arranque en frío.
 - **Alertas**: notificar (mail/Telegram/etc.) cuando se activa un stop, el
   kill switch, o hay errores de conexión repetidos — hoy solo queda
   logueado.
