@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+import pytest
+
 from core.types import Bar
 from strategy.indicators import ADXCalculator
 
@@ -47,3 +49,8 @@ def test_adx_is_low_for_a_choppy_sideways_series():
 
     assert adx is not None
     assert adx < 20
+
+
+def test_adx_calculator_rejects_period_below_one():
+    with pytest.raises(ValueError):
+        ADXCalculator(period=0)

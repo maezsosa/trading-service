@@ -37,6 +37,8 @@ class MovingAverageCrossoverStrategy(Strategy):
         adx_period: int = 14,
         adx_threshold: float = 0.0,
     ):
+        if fast_window < 1 or slow_window < 1:
+            raise ValueError(f"fast_window and slow_window must be >= 1, got {fast_window}/{slow_window}")
         super().__init__(symbol)
         self.fast_window = fast_window
         self.slow_window = slow_window

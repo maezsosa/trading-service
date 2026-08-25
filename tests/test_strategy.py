@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+import pytest
+
 from core.types import Bar, Side
 from strategy.moving_average_crossover import MovingAverageCrossoverStrategy
 
@@ -69,3 +71,10 @@ def test_min_separation_pct_drops_signal_on_whipsaw_before_confirming():
     signals = [strategy.on_bar(make_bar(p, i)) for i, p in enumerate(prices)]
 
     assert all(signal is None for signal in signals)
+
+
+def test_rejects_zero_or_negative_windows():
+    with pytest.raises(ValueError):
+        MovingAverageCrossoverStrategy(symbol="TEST", fast_window=0, slow_window=30)
+    with pytest.raises(ValueError):
+        MovingAverageCrossoverStrategy(symbol="TEST", fast_window=10, slow_window=0)

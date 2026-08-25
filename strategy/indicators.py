@@ -13,6 +13,8 @@ class ADXCalculator:
     """
 
     def __init__(self, period: int = 14):
+        if period < 1:
+            raise ValueError(f"period must be >= 1, got {period}")
         self.period = period
         self._prev_bar: Bar | None = None
         self._tr_values: list[float] = []

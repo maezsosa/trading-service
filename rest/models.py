@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from risk.manager import RiskConfig
 
@@ -12,10 +12,10 @@ class HistoricalBacktestRequest(BaseModel):
     since: str | None = None
     max_bars: int | None = None
     cash: float = 10_000.0
-    fast_window: int = 10
-    slow_window: int = 30
+    fast_window: int = Field(default=10, ge=1)
+    slow_window: int = Field(default=30, ge=1)
     min_separation_pct: float = 0.0
-    adx_period: int = 14
+    adx_period: int = Field(default=14, ge=1)
     adx_threshold: float = 0.0
     max_position_pct: float = RiskConfig().max_position_pct
     risk_per_trade_pct: float = RiskConfig().risk_per_trade_pct
