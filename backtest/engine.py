@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Iterable, Sequence
 
 from core.session import TradingSession
@@ -26,12 +27,17 @@ class Backtester:
         self.risk_manager = risk_manager
         self.broker = broker
         self._session = TradingSession(strategy, risk_manager, broker)
+        self.halted_at: tuple[int, datetime] | None = None
 
     @property
     def equity_curve(self) -> list[tuple]:
         return self._session.equity_curve
 
     def run(self, bars: Iterable[Bar]) -> list[tuple]:
-        for bar in bars:
+        self.halted_at = None
+        for bar_number, bar in enumerate(bars, start=1):
+            was_halted = self.risk_manager.halted
             self._session.process_bar(bar)
+            if self.risk_manager.halted and not was_halted and self.halted_at is None:
+                self.halted_at = (bar_number, bar.timestamp)
         return self._session.equity_curve

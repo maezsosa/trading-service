@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from backtest.engine import Backtester
 from backtest.metrics import bars_per_year, buy_and_hold_equity_curve, compute_metrics
 from broker.paper_broker import PaperBroker
-from core.session import TradingSession
 from data.ccxt_provider import CCXTHistoricalDataProvider
 from rest.models import HistoricalBacktestRequest, HistoricalBacktestResponse, MetricsResponse
 from risk.manager import RiskConfig, RiskManager
@@ -38,13 +38,10 @@ def run_historical_backtest(request: HistoricalBacktestRequest) -> HistoricalBac
         )
     )
     broker = PaperBroker(initial_cash=request.cash, slippage_pct=request.slippage_pct)
-    session = TradingSession(strategy, risk_manager, broker)
+    backtester = Backtester(strategy, risk_manager, broker)
 
     bars = list(data_provider.bars())
-    for bar in bars:
-        session.process_bar(bar)
-
-    equity_curve = session.equity_curve
+    equity_curve = backtester.run(bars)
     ppy = bars_per_year(request.timeframe)
     metrics = compute_metrics(equity_curve, broker.fills, request.cash, periods_per_year=ppy)
 

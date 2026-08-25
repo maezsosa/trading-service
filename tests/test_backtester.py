@@ -14,11 +14,11 @@ def run_backtest(risk_config: RiskConfig, num_bars: int = 300, volatility: float
     backtester = Backtester(strategy=strategy, risk_manager=risk_manager, broker=broker)
 
     equity_curve = backtester.run(provider.bars())
-    return equity_curve, broker, risk_manager
+    return equity_curve, broker, risk_manager, backtester
 
 
 def test_backtester_runs_end_to_end_and_tracks_equity_for_every_bar():
-    equity_curve, broker, _ = run_backtest(RiskConfig(), num_bars=200)
+    equity_curve, broker, _, _ = run_backtest(RiskConfig(), num_bars=200)
 
     assert len(equity_curve) == 200
     assert all(equity > 0 for _, equity in equity_curve)
@@ -27,8 +27,30 @@ def test_backtester_runs_end_to_end_and_tracks_equity_for_every_bar():
 def test_backtester_stops_trading_once_kill_switch_trips():
     # Deliberately aggressive sizing + tight drawdown limit to force a halt.
     risk_config = RiskConfig(max_drawdown_pct=0.02, risk_per_trade_pct=0.5, max_position_pct=1.0)
-    equity_curve, broker, risk_manager = run_backtest(risk_config, num_bars=300, volatility=0.05, seed=7)
+    equity_curve, broker, risk_manager, backtester = run_backtest(
+        risk_config, num_bars=300, volatility=0.05, seed=7
+    )
 
     assert len(equity_curve) == 300
     assert risk_manager.halted
     assert risk_manager.halt_reason is not None
+
+
+def test_backtester_records_the_bar_where_the_kill_switch_first_tripped():
+    risk_config = RiskConfig(max_drawdown_pct=0.02, risk_per_trade_pct=0.5, max_position_pct=1.0)
+    equity_curve, _, risk_manager, backtester = run_backtest(
+        risk_config, num_bars=300, volatility=0.05, seed=7
+    )
+
+    assert risk_manager.halted
+    assert backtester.halted_at is not None
+    bar_number, timestamp = backtester.halted_at
+    assert 1 <= bar_number <= len(equity_curve)
+    assert timestamp == equity_curve[bar_number - 1][0]
+
+
+def test_backtester_halted_at_is_none_when_kill_switch_never_trips():
+    _, _, risk_manager, backtester = run_backtest(RiskConfig(), num_bars=200)
+
+    assert not risk_manager.halted
+    assert backtester.halted_at is None
