@@ -4,6 +4,7 @@ from collections import deque
 
 from core.types import Bar, Side, Signal
 from strategy.base import Strategy
+from strategy.indicators import ADXCalculator
 
 
 class MovingAverageCrossoverStrategy(Strategy):
@@ -16,6 +17,14 @@ class MovingAverageCrossoverStrategy(Strategy):
     before the signal fires -- and drops the pending signal entirely if
     price reverses back through the cross before that confirmation, since
     that reversal is exactly the noise this filter is meant to catch.
+
+    min_separation_pct still tunes the SAME crossover, though -- it can't
+    fix the fact that one fast/slow window pair has to work in both
+    trending and ranging markets. adx_threshold, if set above the default
+    0.0, adds an independent regime gate: a confirmed cross only fires if
+    ADX (trend strength, not direction) is at or above the threshold,
+    regardless of how wide the SMA separation is. Below it, the market is
+    judged too choppy to trade at all.
     """
 
     def __init__(
@@ -25,17 +34,23 @@ class MovingAverageCrossoverStrategy(Strategy):
         slow_window: int = 30,
         stop_loss_pct: float = 0.02,
         min_separation_pct: float = 0.0,
+        adx_period: int = 14,
+        adx_threshold: float = 0.0,
     ):
         super().__init__(symbol)
         self.fast_window = fast_window
         self.slow_window = slow_window
         self.stop_loss_pct = stop_loss_pct
         self.min_separation_pct = min_separation_pct
+        self.adx_threshold = adx_threshold
         self._closes: deque[float] = deque(maxlen=slow_window)
         self._prev_fast_above_slow: bool | None = None
         self._pending_side: Side | None = None
+        self._adx_calc = ADXCalculator(period=adx_period)
 
     def on_bar(self, bar: Bar) -> Signal | None:
+        adx = self._adx_calc.update(bar)
+
         self._closes.append(bar.close)
         if len(self._closes) < self.slow_window:
             return None
@@ -61,12 +76,17 @@ class MovingAverageCrossoverStrategy(Strategy):
             elif separation_pct >= self.min_separation_pct:
                 side = self._pending_side
                 self._pending_side = None
-                signal = Signal(
-                    timestamp=bar.timestamp,
-                    symbol=bar.symbol,
-                    side=side,
-                    stop_loss_pct=self.stop_loss_pct,
-                    reason=f"SMA{self.fast_window}/{self.slow_window} crossover (separation {separation_pct:.2%})",
-                )
+                # A confirmed cross still doesn't fire if the market isn't
+                # trending strongly enough (ADX below threshold) -- dropped
+                # here rather than re-armed, same as a reversal-before-
+                # confirmation: this regime was judged too choppy to trade.
+                if self.adx_threshold <= 0 or (adx is not None and adx >= self.adx_threshold):
+                    signal = Signal(
+                        timestamp=bar.timestamp,
+                        symbol=bar.symbol,
+                        side=side,
+                        stop_loss_pct=self.stop_loss_pct,
+                        reason=f"SMA{self.fast_window}/{self.slow_window} crossover (separation {separation_pct:.2%})",
+                    )
 
         return signal

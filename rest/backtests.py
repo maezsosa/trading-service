@@ -28,6 +28,8 @@ def run_historical_backtest(request: HistoricalBacktestRequest) -> HistoricalBac
         fast_window=request.fast_window,
         slow_window=request.slow_window,
         min_separation_pct=request.min_separation_pct,
+        adx_period=request.adx_period,
+        adx_threshold=request.adx_threshold,
     )
     risk_manager = RiskManager(
         RiskConfig(

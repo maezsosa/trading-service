@@ -15,6 +15,8 @@ class HistoricalBacktestRequest(BaseModel):
     fast_window: int = 10
     slow_window: int = 30
     min_separation_pct: float = 0.0
+    adx_period: int = 14
+    adx_threshold: float = 0.0
     max_position_pct: float = RiskConfig().max_position_pct
     risk_per_trade_pct: float = RiskConfig().risk_per_trade_pct
     max_drawdown_pct: float = RiskConfig().max_drawdown_pct

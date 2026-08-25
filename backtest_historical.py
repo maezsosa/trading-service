@@ -27,6 +27,18 @@ def parse_args() -> argparse.Namespace:
         help="filtro anti-whipsaw: separación mínima entre fast/slow SMA para confirmar la señal (ej. 0.01 = 1%%)",
     )
     parser.add_argument(
+        "--adx-period",
+        type=int,
+        default=14,
+        help="ventana del ADX (default: 14)",
+    )
+    parser.add_argument(
+        "--adx-threshold",
+        type=float,
+        default=0.0,
+        help="filtro de régimen: solo opera si ADX >= este valor (0 = desactivado, ej. 25 = solo tendencias fuertes)",
+    )
+    parser.add_argument(
         "--max-drawdown-pct",
         type=float,
         default=RiskConfig().max_drawdown_pct,
@@ -69,6 +81,8 @@ def main() -> None:
         fast_window=args.fast_window,
         slow_window=args.slow_window,
         min_separation_pct=args.min_separation_pct,
+        adx_period=args.adx_period,
+        adx_threshold=args.adx_threshold,
     )
     risk_manager = RiskManager(
         RiskConfig(
