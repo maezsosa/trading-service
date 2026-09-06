@@ -8,7 +8,7 @@ from backtest.metrics import bars_per_year, buy_and_hold_equity_curve, compute_m
 from broker.paper_broker import PaperBroker
 from data.ccxt_provider import CCXTHistoricalDataProvider
 from risk.manager import RiskConfig, RiskManager
-from strategy.moving_average_crossover import MovingAverageCrossoverStrategy
+from strategy.factory import STRATEGY_NAMES, create_strategy
 
 
 def parse_args() -> argparse.Namespace:
@@ -23,26 +23,43 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--since", default=None, help="ISO8601 start date, e.g. 2024-01-01T00:00:00Z")
     parser.add_argument("--max-bars", type=int, default=None, help="cap on bars fetched, per symbol")
     parser.add_argument("--cash", type=float, default=10_000.0, help="starting cash, shared across the portfolio")
-    parser.add_argument("--fast-window", type=int, default=10)
-    parser.add_argument("--slow-window", type=int, default=30)
+    parser.add_argument(
+        "--strategy",
+        choices=STRATEGY_NAMES,
+        default="crossover",
+        help="qué estrategia correr en cada símbolo (default: crossover)",
+    )
+    parser.add_argument(
+        "--stop-loss-pct",
+        type=float,
+        default=None,
+        help="override del stop-loss de la estrategia elegida (default: el propio de cada estrategia)",
+    )
+    parser.add_argument("--fast-window", type=int, default=10, help="[crossover]")
+    parser.add_argument("--slow-window", type=int, default=30, help="[crossover]")
     parser.add_argument(
         "--min-separation-pct",
         type=float,
         default=0.0,
-        help="filtro anti-whipsaw: separación mínima entre fast/slow SMA para confirmar la señal (ej. 0.01 = 1%%)",
+        help="[crossover] filtro anti-whipsaw: separación mínima entre fast/slow SMA para confirmar la señal (ej. 0.01 = 1%%)",
     )
     parser.add_argument(
         "--adx-period",
         type=int,
         default=14,
-        help="ventana del ADX (default: 14)",
+        help="[crossover] ventana del ADX (default: 14)",
     )
     parser.add_argument(
         "--adx-threshold",
         type=float,
         default=0.0,
-        help="filtro de régimen: solo opera si ADX >= este valor (0 = desactivado, ej. 25 = solo tendencias fuertes)",
+        help="[crossover] filtro de régimen: solo opera si ADX >= este valor (0 = desactivado, ej. 25 = solo tendencias fuertes)",
     )
+    parser.add_argument("--entry-window", type=int, default=20, help="[donchian] ventana de entrada")
+    parser.add_argument("--exit-window", type=int, default=10, help="[donchian] ventana de salida")
+    parser.add_argument("--rsi-period", type=int, default=14, help="[rsi] período del RSI")
+    parser.add_argument("--oversold", type=float, default=30.0, help="[rsi] umbral de sobreventa")
+    parser.add_argument("--overbought", type=float, default=70.0, help="[rsi] umbral de sobrecompra")
     parser.add_argument(
         "--max-drawdown-pct",
         type=float,
@@ -103,13 +120,20 @@ def main() -> None:
         for symbol in symbols
     ]
     strategies = [
-        MovingAverageCrossoverStrategy(
-            symbol=symbol,
+        create_strategy(
+            args.strategy,
+            symbol,
             fast_window=args.fast_window,
             slow_window=args.slow_window,
             min_separation_pct=args.min_separation_pct,
             adx_period=args.adx_period,
             adx_threshold=args.adx_threshold,
+            entry_window=args.entry_window,
+            exit_window=args.exit_window,
+            rsi_period=args.rsi_period,
+            oversold=args.oversold,
+            overbought=args.overbought,
+            stop_loss_pct=args.stop_loss_pct,
         )
         for symbol in symbols
     ]
@@ -137,6 +161,7 @@ def main() -> None:
 
     final_equity = equity_curve[-1][1] if equity_curve else args.cash
 
+    print(f"Estrategia:           {args.strategy}")
     print(f"Exchange:             {args.exchange}")
     print(f"Symbols:              {', '.join(symbols)} ({args.timeframe})")
     print(f"Bars procesadas:      {len(equity_curve)}")

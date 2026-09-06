@@ -199,6 +199,10 @@
             <input id="since" type="date" value="2024-01-01">
           </div>
           <div class="field">
+            <label for="max_bars">Máx. barras (vacío = todas hasta hoy)</label>
+            <input id="max_bars" type="number" min="1" placeholder="sin límite">
+          </div>
+          <div class="field">
             <label for="cash">Cash inicial</label>
             <input id="cash" type="number" value="10000" step="100">
           </div>
@@ -206,28 +210,73 @@
 
         <fieldset>
           <legend>Estrategia</legend>
-          <div class="row2">
-            <div class="field">
-              <label for="fast_window">Fast window</label>
-              <input id="fast_window" type="number" value="10" min="1">
-            </div>
-            <div class="field">
-              <label for="slow_window">Slow window</label>
-              <input id="slow_window" type="number" value="30" min="1">
-            </div>
+          <div class="field">
+            <label for="strategy_name">Tipo</label>
+            <select id="strategy_name">
+              <option value="crossover" selected>Crossover (medias móviles)</option>
+              <option value="donchian">Donchian (breakout)</option>
+              <option value="rsi">RSI (reversión a la media)</option>
+            </select>
           </div>
           <div class="field">
-            <label for="min_separation_pct">Separación mínima (%)</label>
-            <input id="min_separation_pct" type="number" value="1" step="0.1">
+            <label for="stop_loss_pct">Stop-loss (%, vacío = default de la estrategia)</label>
+            <input id="stop_loss_pct" type="number" step="0.1" placeholder="default">
           </div>
-          <div class="row2">
-            <div class="field">
-              <label for="adx_period">ADX período</label>
-              <input id="adx_period" type="number" value="14" min="1">
+
+          <div id="params-crossover" class="strategy-params">
+            <div class="row2">
+              <div class="field">
+                <label for="fast_window">Fast window</label>
+                <input id="fast_window" type="number" value="10" min="1">
+              </div>
+              <div class="field">
+                <label for="slow_window">Slow window</label>
+                <input id="slow_window" type="number" value="30" min="1">
+              </div>
             </div>
             <div class="field">
-              <label for="adx_threshold">ADX mínimo (0=off)</label>
-              <input id="adx_threshold" type="number" value="0">
+              <label for="min_separation_pct">Separación mínima (%)</label>
+              <input id="min_separation_pct" type="number" value="1" step="0.1">
+            </div>
+            <div class="row2">
+              <div class="field">
+                <label for="adx_period">ADX período</label>
+                <input id="adx_period" type="number" value="14" min="1">
+              </div>
+              <div class="field">
+                <label for="adx_threshold">ADX mínimo (0=off)</label>
+                <input id="adx_threshold" type="number" value="0">
+              </div>
+            </div>
+          </div>
+
+          <div id="params-donchian" class="strategy-params" hidden>
+            <div class="row2">
+              <div class="field">
+                <label for="entry_window">Entry window</label>
+                <input id="entry_window" type="number" value="20" min="1">
+              </div>
+              <div class="field">
+                <label for="exit_window">Exit window</label>
+                <input id="exit_window" type="number" value="10" min="1">
+              </div>
+            </div>
+          </div>
+
+          <div id="params-rsi" class="strategy-params" hidden>
+            <div class="field">
+              <label for="rsi_period">RSI período</label>
+              <input id="rsi_period" type="number" value="14" min="1">
+            </div>
+            <div class="row2">
+              <div class="field">
+                <label for="oversold">Sobreventa</label>
+                <input id="oversold" type="number" value="30">
+              </div>
+              <div class="field">
+                <label for="overbought">Sobrecompra</label>
+                <input id="overbought" type="number" value="70">
+              </div>
             </div>
           </div>
         </fieldset>
@@ -284,6 +333,16 @@ const placeholder = document.getElementById('placeholder');
 const chartArea = document.getElementById('chart-area');
 const chartSvg = document.getElementById('chart');
 const statsGrid = document.getElementById('stats-grid');
+const strategySelect = document.getElementById('strategy_name');
+
+function updateStrategyParamsVisibility() {
+  const selected = strategySelect.value;
+  for (const el of document.querySelectorAll('.strategy-params')) {
+    el.hidden = el.id !== `params-${selected}`;
+  }
+}
+strategySelect.addEventListener('change', updateStrategyParamsVisibility);
+updateStrategyParamsVisibility();
 
 function fmtPct(n) {
   if (n === null || n === undefined) return '—';
@@ -381,12 +440,22 @@ form.addEventListener('submit', async (e) => {
     symbol: document.getElementById('symbol').value,
     timeframe: document.getElementById('timeframe').value,
     since: document.getElementById('since').value ? document.getElementById('since').value + 'T00:00:00Z' : null,
+    max_bars: document.getElementById('max_bars').value ? parseInt(document.getElementById('max_bars').value, 10) : null,
     cash: parseFloat(document.getElementById('cash').value),
+    strategy: strategySelect.value,
+    stop_loss_pct: document.getElementById('stop_loss_pct').value
+      ? parseFloat(document.getElementById('stop_loss_pct').value) / 100
+      : null,
     fast_window: parseInt(document.getElementById('fast_window').value, 10),
     slow_window: parseInt(document.getElementById('slow_window').value, 10),
     min_separation_pct: parseFloat(document.getElementById('min_separation_pct').value) / 100,
     adx_period: parseInt(document.getElementById('adx_period').value, 10),
     adx_threshold: parseFloat(document.getElementById('adx_threshold').value),
+    entry_window: parseInt(document.getElementById('entry_window').value, 10),
+    exit_window: parseInt(document.getElementById('exit_window').value, 10),
+    rsi_period: parseInt(document.getElementById('rsi_period').value, 10),
+    oversold: parseFloat(document.getElementById('oversold').value),
+    overbought: parseFloat(document.getElementById('overbought').value),
     max_position_pct: parseFloat(document.getElementById('max_position_pct').value) / 100,
     risk_per_trade_pct: parseFloat(document.getElementById('risk_per_trade_pct').value) / 100,
     max_drawdown_pct: parseFloat(document.getElementById('max_drawdown_pct').value) / 100,

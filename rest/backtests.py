@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from backtest.engine import Backtester
 from backtest.metrics import bars_per_year, buy_and_hold_equity_curve, compute_metrics
@@ -8,7 +8,7 @@ from broker.paper_broker import PaperBroker
 from data.ccxt_provider import CCXTHistoricalDataProvider
 from rest.models import HistoricalBacktestRequest, HistoricalBacktestResponse, MetricsResponse
 from risk.manager import RiskConfig, RiskManager
-from strategy.moving_average_crossover import MovingAverageCrossoverStrategy
+from strategy.factory import create_strategy
 
 router = APIRouter()
 
@@ -23,14 +23,24 @@ def run_historical_backtest(request: HistoricalBacktestRequest) -> HistoricalBac
         max_bars=request.max_bars,
         exchange_id=request.exchange,
     )
-    strategy = MovingAverageCrossoverStrategy(
-        symbol=request.symbol,
-        fast_window=request.fast_window,
-        slow_window=request.slow_window,
-        min_separation_pct=request.min_separation_pct,
-        adx_period=request.adx_period,
-        adx_threshold=request.adx_threshold,
-    )
+    try:
+        strategy = create_strategy(
+            request.strategy,
+            request.symbol,
+            fast_window=request.fast_window,
+            slow_window=request.slow_window,
+            min_separation_pct=request.min_separation_pct,
+            adx_period=request.adx_period,
+            adx_threshold=request.adx_threshold,
+            entry_window=request.entry_window,
+            exit_window=request.exit_window,
+            rsi_period=request.rsi_period,
+            oversold=request.oversold,
+            overbought=request.overbought,
+            stop_loss_pct=request.stop_loss_pct,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     risk_manager = RiskManager(
         RiskConfig(
             max_drawdown_pct=request.max_drawdown_pct,
