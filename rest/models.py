@@ -12,7 +12,7 @@ class HistoricalBacktestRequest(BaseModel):
     since: str | None = None
     max_bars: int | None = None
     cash: float = 10_000.0
-    strategy: str = "crossover"  # "crossover" | "donchian" | "rsi"
+    strategy: str = "crossover"  # "crossover" | "donchian" | "rsi" | "buy_and_hold"
     stop_loss_pct: float | None = None
     fast_window: int = Field(default=10, ge=1)
     slow_window: int = Field(default=30, ge=1)

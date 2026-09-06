@@ -1,5 +1,6 @@
 import pytest
 
+from strategy.buy_and_hold import BuyAndHoldStrategy
 from strategy.donchian_breakout import DonchianBreakoutStrategy
 from strategy.factory import create_strategy
 from strategy.moving_average_crossover import MovingAverageCrossoverStrategy
@@ -41,6 +42,13 @@ def test_stop_loss_pct_defaults_to_each_strategys_own_class_default_when_omitted
     strategy = create_strategy("rsi", "TEST")
 
     assert strategy.stop_loss_pct == RSIMeanReversionStrategy(symbol="TEST").stop_loss_pct
+
+
+def test_creates_buy_and_hold_strategy():
+    strategy = create_strategy("buy_and_hold", "TEST", stop_loss_pct=0.5)
+
+    assert isinstance(strategy, BuyAndHoldStrategy)
+    assert strategy.stop_loss_pct == 0.5
 
 
 def test_unknown_strategy_name_raises():

@@ -7,7 +7,7 @@ from backtest.metrics import bars_per_year, buy_and_hold_equity_curve, compute_m
 from broker.paper_broker import PaperBroker
 from data.ccxt_provider import CCXTHistoricalDataProvider
 from risk.manager import RiskConfig, RiskManager
-from strategy.factory import STRATEGY_NAMES, create_strategy
+from strategy.factory import STRATEGY_NAMES, buy_and_hold_sizing_warning, create_strategy
 
 
 def parse_args() -> argparse.Namespace:
@@ -85,6 +85,11 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+
+    warning = buy_and_hold_sizing_warning(args.strategy, args.max_position_pct, args.risk_per_trade_pct, args.stop_loss_pct)
+    if warning:
+        print(warning)
+        print()
 
     data_provider = CCXTHistoricalDataProvider(
         symbol=args.symbol,
