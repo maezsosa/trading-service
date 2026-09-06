@@ -55,6 +55,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rsi-period", type=int, default=14, help="[rsi] período del RSI")
     parser.add_argument("--oversold", type=float, default=30.0, help="[rsi] umbral de sobreventa")
     parser.add_argument("--overbought", type=float, default=70.0, help="[rsi] umbral de sobrecompra")
+    parser.add_argument("--trail-pct", type=float, default=0.15, help="[trailing_reentry] fracción de caída desde el pico para vender (ej. 0.15 = 15%%)")
+    parser.add_argument("--reentry-pct", type=float, default=0.10, help="[trailing_reentry] fracción de recuperación desde el piso para recomprar (ej. 0.10 = 10%%)")
     parser.add_argument(
         "--max-drawdown-pct",
         type=float,
@@ -111,6 +113,8 @@ def main() -> None:
         rsi_period=args.rsi_period,
         oversold=args.oversold,
         overbought=args.overbought,
+        trail_pct=args.trail_pct,
+        reentry_pct=args.reentry_pct,
         stop_loss_pct=args.stop_loss_pct,
     )
     risk_manager = RiskManager(

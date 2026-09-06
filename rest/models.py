@@ -12,7 +12,7 @@ class HistoricalBacktestRequest(BaseModel):
     since: str | None = None
     max_bars: int | None = None
     cash: float = 10_000.0
-    strategy: str = "crossover"  # "crossover" | "donchian" | "rsi" | "buy_and_hold"
+    strategy: str = "crossover"  # "crossover" | "donchian" | "rsi" | "buy_and_hold" | "trailing_reentry"
     stop_loss_pct: float | None = None
     fast_window: int = Field(default=10, ge=1)
     slow_window: int = Field(default=30, ge=1)
@@ -24,6 +24,8 @@ class HistoricalBacktestRequest(BaseModel):
     rsi_period: int = Field(default=14, ge=1)
     oversold: float = 30.0
     overbought: float = 70.0
+    trail_pct: float = 0.15
+    reentry_pct: float = 0.10
     max_position_pct: float = RiskConfig().max_position_pct
     risk_per_trade_pct: float = RiskConfig().risk_per_trade_pct
     max_drawdown_pct: float = RiskConfig().max_drawdown_pct

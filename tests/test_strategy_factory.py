@@ -5,6 +5,7 @@ from strategy.donchian_breakout import DonchianBreakoutStrategy
 from strategy.factory import create_strategy
 from strategy.moving_average_crossover import MovingAverageCrossoverStrategy
 from strategy.rsi_mean_reversion import RSIMeanReversionStrategy
+from strategy.trailing_reentry import TrailingReentryStrategy
 
 
 def test_creates_crossover_strategy():
@@ -49,6 +50,14 @@ def test_creates_buy_and_hold_strategy():
 
     assert isinstance(strategy, BuyAndHoldStrategy)
     assert strategy.stop_loss_pct == 0.5
+
+
+def test_creates_trailing_reentry_strategy():
+    strategy = create_strategy("trailing_reentry", "TEST", trail_pct=0.2, reentry_pct=0.05)
+
+    assert isinstance(strategy, TrailingReentryStrategy)
+    assert strategy.trail_pct == 0.2
+    assert strategy.reentry_pct == 0.05
 
 
 def test_unknown_strategy_name_raises():

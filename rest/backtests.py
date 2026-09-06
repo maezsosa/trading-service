@@ -37,6 +37,8 @@ def run_historical_backtest(request: HistoricalBacktestRequest) -> HistoricalBac
             rsi_period=request.rsi_period,
             oversold=request.oversold,
             overbought=request.overbought,
+            trail_pct=request.trail_pct,
+            reentry_pct=request.reentry_pct,
             stop_loss_pct=request.stop_loss_pct,
         )
     except ValueError as exc:

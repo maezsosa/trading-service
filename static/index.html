@@ -217,6 +217,7 @@
               <option value="donchian">Donchian (breakout)</option>
               <option value="rsi">RSI (reversión a la media)</option>
               <option value="buy_and_hold">Buy &amp; hold</option>
+              <option value="trailing_reentry">Trailing + reingreso</option>
             </select>
           </div>
           <div class="field">
@@ -285,6 +286,23 @@
             <p style="font-size:12.5px;color:var(--text-secondary);margin:0;">
               Compra una vez y no vende. Usa un stop muy ancho como aproximación (el motor exige uno) —
               para que quede realmente invertida, subí <strong>Max posición</strong> y <strong>Riesgo/trade</strong> (en Riesgo, abajo) cerca del máximo.
+            </p>
+          </div>
+
+          <div id="params-trailing_reentry" class="strategy-params" hidden>
+            <div class="row2">
+              <div class="field">
+                <label for="trail_pct">Caída desde el pico (%)</label>
+                <input id="trail_pct" type="number" value="15" step="1">
+              </div>
+              <div class="field">
+                <label for="reentry_pct">Recuperación desde el piso (%)</label>
+                <input id="reentry_pct" type="number" value="10" step="1">
+              </div>
+            </div>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin:8px 0 0;">
+              Empieza comprada como buy-and-hold, vende si el precio cae ese % desde su máximo, y recompra si se recupera ese % desde el piso.
+              Mismo aviso que buy-and-hold: subí <strong>Max posición</strong> y <strong>Riesgo/trade</strong> para quedar realmente invertida.
             </p>
           </div>
         </fieldset>
@@ -464,6 +482,8 @@ form.addEventListener('submit', async (e) => {
     rsi_period: parseInt(document.getElementById('rsi_period').value, 10),
     oversold: parseFloat(document.getElementById('oversold').value),
     overbought: parseFloat(document.getElementById('overbought').value),
+    trail_pct: parseFloat(document.getElementById('trail_pct').value) / 100,
+    reentry_pct: parseFloat(document.getElementById('reentry_pct').value) / 100,
     max_position_pct: parseFloat(document.getElementById('max_position_pct').value) / 100,
     risk_per_trade_pct: parseFloat(document.getElementById('risk_per_trade_pct').value) / 100,
     max_drawdown_pct: parseFloat(document.getElementById('max_drawdown_pct').value) / 100,
