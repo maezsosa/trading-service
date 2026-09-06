@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from core.types import Bar
-from strategy.indicators import ADXCalculator
+from strategy.indicators import ADXCalculator, RSICalculator
 
 
 def make_bar(index: int, close: float, rng: float = 1.0) -> Bar:
@@ -54,3 +54,40 @@ def test_adx_is_low_for_a_choppy_sideways_series():
 def test_adx_calculator_rejects_period_below_one():
     with pytest.raises(ValueError):
         ADXCalculator(period=0)
+
+
+def test_rsi_is_none_before_warmup():
+    calc = RSICalculator(period=14)
+
+    rsi = None
+    for i in range(10):
+        rsi = calc.update(100 + i)
+
+    assert rsi is None
+
+
+def test_rsi_is_high_for_a_steadily_rising_series():
+    calc = RSICalculator(period=14)
+
+    rsi = None
+    for i in range(30):
+        rsi = calc.update(100 + i)
+
+    assert rsi is not None
+    assert rsi > 90  # all gains, no losses -- close to the 100 ceiling
+
+
+def test_rsi_is_low_for_a_steadily_falling_series():
+    calc = RSICalculator(period=14)
+
+    rsi = None
+    for i in range(30):
+        rsi = calc.update(100 - i)
+
+    assert rsi is not None
+    assert rsi < 10  # all losses, no gains -- close to the 0 floor
+
+
+def test_rsi_calculator_rejects_period_below_one():
+    with pytest.raises(ValueError):
+        RSICalculator(period=0)

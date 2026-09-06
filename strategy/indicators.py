@@ -74,3 +74,49 @@ class ADXCalculator:
             self._adx = (self._adx * (self.period - 1) + dx) / self.period
 
         return self._adx
+
+
+class RSICalculator:
+    """Wilder's Relative Strength Index, computed incrementally bar by bar.
+
+    0-100: high RSI means recent closes have been mostly gains (overbought),
+    low RSI means mostly losses (oversold). Feed it closes in order via
+    update(); returns None until enough bars have arrived to warm up
+    (period + 1 closes).
+    """
+
+    def __init__(self, period: int = 14):
+        if period < 1:
+            raise ValueError(f"period must be >= 1, got {period}")
+        self.period = period
+        self._prev_close: float | None = None
+        self._gains: list[float] = []
+        self._losses: list[float] = []
+        self._avg_gain: float | None = None
+        self._avg_loss: float | None = None
+
+    def update(self, close: float) -> float | None:
+        prev = self._prev_close
+        self._prev_close = close
+        if prev is None:
+            return None
+
+        diff = close - prev
+        gain = max(diff, 0.0)
+        loss = max(-diff, 0.0)
+
+        if self._avg_gain is None:
+            self._gains.append(gain)
+            self._losses.append(loss)
+            if len(self._gains) < self.period:
+                return None
+            self._avg_gain = sum(self._gains) / self.period
+            self._avg_loss = sum(self._losses) / self.period
+        else:
+            # Wilder's smoothing: each new value replaces 1/period of the running average.
+            self._avg_gain += (gain - self._avg_gain) / self.period
+            self._avg_loss += (loss - self._avg_loss) / self.period
+
+        if self._avg_gain + self._avg_loss == 0:
+            return 50.0  # no movement at all -- neither overbought nor oversold
+        return 100 * self._avg_gain / (self._avg_gain + self._avg_loss)
